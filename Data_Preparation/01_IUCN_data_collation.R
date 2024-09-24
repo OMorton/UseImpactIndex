@@ -78,15 +78,23 @@ PurpTable <- tables[grep('Purpose', tables)][[1]] %>% janitor::clean_names()
 
 
 # For all species
-BOTW <- read.csv("Data/Taxonomy/HBW/BOTW_Taxonomy_clean_Dec2023.csv")
+#BOTW <- read.csv("Data/Taxonomy/HBW/BOTW_Taxonomy_clean_Dec2023.csv")
 #speciesList <- read.csv("Data/Taxonomy/HBW/BOTW_Taxonomy_clean_Dec2023.csv")
+BOTW <- read.csv("Data/Taxonomy/HBW/BOTW_Taxonomy_v81.csv") %>% filter(!is.na(SISRecID)) %>%
+  select(Order, Family, Family.name, Common.name, Scientific.name, SISRecID,
+         X2023.IUCN.Red.List.category) %>%
+  rename("sn"=Scientific.name, "cn"=Common.name, "IUCN2023" = X2023.IUCN.Red.List.category)
+
 
 # function to scrape all species
 scrape_birdlife <- function(speciesList){
   n = nrow(speciesList)
   ## add a new column to the current list for forest dependency
   df <- speciesList %>% 
-    add_column(ForestDependency = NA)
+    add_column(ForestDependency = NA,
+               MigrStatus = NA,
+               Alt = NA,
+               Alt_lim = NA)
   ## add df for habitat data
   df2 <- speciesList
   habstore <- data.frame()
@@ -138,15 +146,15 @@ scrape_birdlife <- function(speciesList){
       
       ## find the table which lists forest dependency and hab
       fdTable <- tables[grep('Forest dependency', tables)]
-      HabTable <- tables[grep('Habitat', tables)][[1]] %>% slice(-n()) %>% janitor::clean_names()
+      HabTable <- tables[grep('(level 1)', tables)][[1]] %>% slice(-n()) %>% janitor::clean_names()
       HabTable$sn <- sn
-      ElevTable <- tables[grep('Habitat', tables)][[1]] %>% slice_tail()
+      ElevTable <- tables[grep('(level 1)', tables)][[1]] %>% slice_tail()
       HistTable <- tables[grep('Category', tables)][[1]]
       HistTable$sn <- sn
       # not all sp have use and purpose recorded so need to handle those omissions
-      PurpTable <- tryCatch({tables[grep('Purpose', tables)][[1]] %>% 
-        janitor::clean_names() %>% select(!primary_form_used, !life_stage_used, !source)
-      PurpTable$sn <- sn},
+      PurpTable <- tryCatch({tables[grep('Primary form used', tables)][[1]] %>% 
+        janitor::clean_names() %>% select(!c(primary_form_used,life_stage_used, source)) %>%
+          mutate(sn = sn)},
       error = function(cond) {data.frame(purpose = NA, scale = NA, level = NA,
                                          timing = NA, sn = sn)})
       
@@ -170,7 +178,13 @@ scrape_birdlife <- function(speciesList){
 }
 
 # test run
-Out <- scrape_birdlife(BOTW[7,])
+Out <- scrape_birdlife(BOTW[1:2,])
 # full run
 BL_all_scrape <- scrape_birdlife(BOTW)
 
+write.csv(BL_all_scrape$FDep, "Data/IUCN/ForestDep_and_elev_Sept2024.csv")
+write.csv(BL_all_scrape$Hab, "Data/IUCN/Habitatdetails_Sept2024.csv")
+write.csv(BL_all_scrape$Purp, "Data/IUCN/UseandPurpose_Sept2024.csv")
+write.csv(BL_all_scrape$History, "Data/IUCN/IUCNHistoricalAssessments_Sept2024.csv")
+
+## errors: Mikado Pheasant 323, Swinhoes Pheasant 338 (Location 4 doesn't exist. There are only 2 columns)
