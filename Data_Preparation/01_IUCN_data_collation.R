@@ -57,6 +57,71 @@ for(i in 1:nrow(IUCN_all)){ # would have used for(sp in speciesList) but need i 
 }
 
 #write.csv(df, "Data/IUCN/IUCN_all_ThreatAssessments_Sept2024.csv")
+
+# Make threat score matrix -----------------------------------------------------
+
+
+thr_raw <- read.csv("Data/IUCN/IUCN_all_ThreatAssessments_Sept2024.csv")
+
+# calc the threat score, incorporating the unknown scope
+thr_raw <- thr_raw %>% mutate(timing_sc = case_when(timing == "Ongoing" ~ 3,
+                                                    timing == "Past, Unlikely to Return" ~ 0, 
+                                                    timing == "Past, Likely to Return" ~ 1,
+                                                    timing == "Future" ~ 1,
+                                                    timing == "Unknown" ~ 2),
+                              scope_sc = case_when(scope == "Minority (<50%)" ~ 1,
+                                                   scope == "Majority (50-90%)" ~ 2,
+                                                   scope == "Whole (>90%)" ~ 3,
+                                                   scope == "Unknown" ~ 2,
+                                                   is.na(scope) & !is.na(code) ~2),
+                              severity_sc = case_when(severity == "Very Rapid Declines" ~ 3,
+                                                      severity == "Rapid Declines" ~ 2,
+                                                      severity == "Slow, Significant Declines" ~ 1,
+                                                      severity == "Causing/Could cause fluctuations" ~ 1,
+                                                      severity == "Negligible declines" ~ 0,
+                                                      severity == "No decline" ~ 0,
+                                                      severity == "Unknown" ~ 2,
+                                                      is.na(severity) & !is.na(code) ~ 2),
+                              score_upd = timing_sc + scope_sc + severity_sc,
+                              code_coarse = substring(code, 1, 2),
+                              code_coarse = gsub("\\.","", code_coarse))
+
+
+# extract the highest threat score per broad category of threat
+thr_sum <- thr_raw %>% group_by(scientificName, code_coarse) %>%
+  summarise(score_upd = max(score_upd))
+
+backbone <- expand.grid(scientificName = unique(thr_sum$scientificName),
+                        code_coarse = as.character(c(1:12)))
+
+# ref data of the IUCN threat classification 3.1
+# https://www.iucnredlist.org/resources/threat-classification-scheme
+thr_class <- data.frame(code_coarse = as.character(c(1:12)), 
+                        name = c("residential_commercial_development",
+                                 "agriculture_aquaculture",
+                                 "energy_mining",
+                                 "transportation_service_corridors",
+                                 "biological_resource_use",
+                                 "human_intrusions_disturbance",
+                                 "natural_system_modifications",
+                                 "invasives_diseases",
+                                 "pollution",
+                                 "geological_events",
+                                 "climate_change",
+                                 "other"))
+
+# expanded version of the data frame with the absence of each threat  zero filled
+# for each species where it is not given.
+thr_exp <- left_join(backbone, thr_sum) %>% 
+  left_join(thr_class) %>%
+  mutate(score_upd = ifelse(is.na(score_upd), 0, score_upd))
+
+# wide data version
+thr_wide <- thr_exp %>% select(-code_coarse) %>% 
+  pivot_wider(id_cols = scientificName, names_from = "name", values_from = "score_upd")
+
+write.csv(thr_wide, "Data/IUCN/IUCN_wide_ThreatMatrix_Sept2024.csv")
+
 df <- read.csv("Data/IUCN/IUCN_all_ThreatAssessments_Sept2024.csv")
 
 
@@ -187,4 +252,9 @@ write.csv(BL_all_scrape$Hab, "Data/IUCN/Habitatdetails_Sept2024.csv")
 write.csv(BL_all_scrape$Purp, "Data/IUCN/UseandPurpose_Sept2024.csv")
 write.csv(BL_all_scrape$History, "Data/IUCN/IUCNHistoricalAssessments_Sept2024.csv")
 
-## errors: Mikado Pheasant 323, Swinhoes Pheasant 338 (Location 4 doesn't exist. There are only 2 columns)
+## errors: R<fc>ppell's Warbler Alstr<f6>m's Warbler Oberl<e4>nder's Ground-thrush
+# R<fc>ppell's Starling R<fc>ppell's Chat R<fc>ppell's Robin-Chat R<fc>ck's Blue-flycatcher
+# B<f6>hm's Flycatcher B<f6>hm's Flycatcher
+# unable to translate to wide string
+
+# time out Ultramarine Grosbeak, Glaucous-blue Grosbeak, Western Tanager, Western Tanager
