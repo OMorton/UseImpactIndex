@@ -140,15 +140,24 @@ HabTable <- tables[grep('Habitat', tables)][[1]] %>% slice(-n())
 ElevTable <- tables[grep('Habitat', tables)][[1]] %>% slice_tail()
 HistTable <- tables[grep('Category', tables)][[1]]
 PurpTable <- tables[grep('Purpose', tables)][[1]] %>% janitor::clean_names()
-
+EOOTable <- tables[grep('Extent of Occurrence', tables)][[1]]
+EOOTable$Estimate[1]
 
 # For all species
 #BOTW <- read.csv("Data/Taxonomy/HBW/BOTW_Taxonomy_clean_Dec2023.csv")
 #speciesList <- read.csv("Data/Taxonomy/HBW/BOTW_Taxonomy_clean_Dec2023.csv")
-BOTW <- read.csv("Data/Taxonomy/HBW/BOTW_Taxonomy_v81.csv") %>% filter(!is.na(SISRecID)) %>%
-  select(Order, Family, Family.name, Common.name, Scientific.name, SISRecID,
-         X2023.IUCN.Red.List.category) %>%
-  rename("sn"=Scientific.name, "cn"=Common.name, "IUCN2023" = X2023.IUCN.Red.List.category)
+
+BOTW <- data.table::fread("Data/Taxonomy/HBW/BOTW_Taxonomy_v81.csv", encoding = "Latin-1") %>% 
+  filter(!is.na(SISRecID)) %>%
+  select(Order, Family, `Family name`, `Common name`, `Scientific name`, SISRecID,
+         `2023 IUCN Red List category`) %>%
+  rename("sn"=`Scientific name`, "cn"=`Common name`, "IUCN2023" = `2023 IUCN Red List category`) %>%
+  mutate(cn = gsub("'", "", cn),
+         cn = gsub('á', 'a', cn),
+         cn = gsub('ç', 'c', cn),
+         cn = gsub('ä', 'a', cn),
+         cn = gsub('ü', 'u', cn),
+         cn = gsub('ö','o', cn))
 
 
 # function to scrape all species
@@ -157,6 +166,7 @@ scrape_birdlife <- function(speciesList){
   ## add a new column to the current list for forest dependency
   df <- speciesList %>% 
     add_column(ForestDependency = NA,
+               EOO = NA,
                MigrStatus = NA,
                Alt = NA,
                Alt_lim = NA)
@@ -186,12 +196,6 @@ scrape_birdlife <- function(speciesList){
       ## obtain the url
       sn <- speciesList$sn[i]
       cn <- speciesList$cn[i]
-      cn <- gsub("'", "", cn)
-      cn <- gsub('á', 'a', cn)
-      cn <- gsub('ç', 'c', cn)
-      cn <- gsub('ä', 'a', cn)
-      cn <- gsub('ü', 'u', cn)
-      cn <- gsub('ö','o', cn)
       
       ## print species name to check progress (alternative to the progress bar)
       cat(paste0(cn, ": ", i, " out of ", n, "\n"))
@@ -205,12 +209,15 @@ scrape_birdlife <- function(speciesList){
       ## read html from website
       web <- read_html(theurl)
       
+      tables <- NULL
       ## extract table data from html
       tables <- html_elements(web, '.table') %>% 
         html_table()
       
       ## find the table which lists forest dependency and hab
       fdTable <- tables[grep('Forest dependency', tables)]
+      EOOTable <- tables[grep('Extent of Occurrence', tables)]
+      
       HabTable <- tables[grep('(level 1)', tables)][[1]] %>% slice(-n()) %>% janitor::clean_names()
       HabTable$sn <- sn
       ElevTable <- tables[grep('(level 1)', tables)][[1]] %>% slice_tail()
@@ -225,6 +232,7 @@ scrape_birdlife <- function(speciesList){
       
       ## input forest dep, elevs, and migr status
       df$ForestDependency[i] <- fdTable[[1]]$X4[1]
+      df$EOO[i] <- EOOTable[[1]]$Estimate[1]
       df$MigrStatus[i] <- fdTable[[1]]$X2[1]
       df$Alt[i] <- ElevTable[[1,2]]
       df$Alt_lim[i] <- ElevTable[[1,4]]
@@ -252,6 +260,8 @@ write.csv(BL_all_scrape$Hab, "Data/IUCN/Habitatdetails_Sept2024.csv")
 write.csv(BL_all_scrape$Purp, "Data/IUCN/UseandPurpose_Sept2024.csv")
 write.csv(BL_all_scrape$History, "Data/IUCN/IUCNHistoricalAssessments_Sept2024.csv")
 
+t <- BL_all_scrape$FDep 
+t2 <-t %>% filter(is.na(ForestDependency), is.na(Alt))
 ## errors: R<fc>ppell's Warbler Alstr<f6>m's Warbler Oberl<e4>nder's Ground-thrush
 # R<fc>ppell's Starling R<fc>ppell's Chat R<fc>ppell's Robin-Chat R<fc>ck's Blue-flycatcher
 # B<f6>hm's Flycatcher B<f6>hm's Flycatcher
