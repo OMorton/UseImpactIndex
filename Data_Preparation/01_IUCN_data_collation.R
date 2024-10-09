@@ -84,7 +84,14 @@ thr_raw <- thr_raw %>% mutate(timing_sc = case_when(timing == "Ongoing" ~ 3,
                                                       is.na(severity) & !is.na(code) ~ 2),
                               score_upd = timing_sc + scope_sc + severity_sc,
                               code_coarse = substring(code, 1, 2),
-                              code_coarse = gsub("\\.","", code_coarse))
+                              code_coarse = gsub("\\.","", code_coarse),
+                              code_coarse = case_when(code %in% c("5.1", "5.1.1", "5.1.2", "5.1.3", "5.1.4") ~ "5.1",
+                                                      code %in% c("5.2", "5.2.1", "5.2.2", "5.2.3", "5.2.4",
+                                                                  "5.3", "5.3.1", "5.3.2", "5.3.3", "5.3.4",
+                                                                  "5.3.5") ~ "5.2-5.3",
+                                                      code %in% c("5.4", "5.4.1", "5.4.2", "5.4.3", "5.4.4",
+                                                                  "5.4.5", "5.4.6") ~ "5.4",
+                                                      .default = code_coarse))
 
 
 # extract the highest threat score per broad category of threat
@@ -96,12 +103,15 @@ backbone <- expand.grid(scientificName = unique(thr_sum$scientificName),
 
 # ref data of the IUCN threat classification 3.1
 # https://www.iucnredlist.org/resources/threat-classification-scheme
-thr_class <- data.frame(code_coarse = as.character(c(1:12)), 
+thr_class <- data.frame(code_coarse = c("1", "2", "3", "4","5.1", "5.2-5.3", "5.4",
+                                        "6", "7", "8", "9", "10", "11", "12"), 
                         name = c("residential_commercial_development",
                                  "agriculture_aquaculture",
                                  "energy_mining",
                                  "transportation_service_corridors",
-                                 "biological_resource_use",
+                                 "biological_resource_use_hunting",
+                                 "biological_resource_use_loggingplants",
+                                 "biological_resource_use_fishing",
                                  "human_intrusions_disturbance",
                                  "natural_system_modifications",
                                  "invasives_diseases",
@@ -130,7 +140,6 @@ df <- read.csv("Data/IUCN/IUCN_all_ThreatAssessments_Sept2024.csv")
 
 # Example 
 web <- read_html("http://datazone.birdlife.org/species/factsheet/papuan-hornbill-rhyticeros-plicatus/details")
-
 ## extract table data 
 tables <- html_elements(web, '.table') %>% 
   html_table()
@@ -260,11 +269,15 @@ write.csv(BL_all_scrape$Hab, "Data/IUCN/Habitatdetails_Sept2024.csv")
 write.csv(BL_all_scrape$Purp, "Data/IUCN/UseandPurpose_Sept2024.csv")
 write.csv(BL_all_scrape$History, "Data/IUCN/IUCNHistoricalAssessments_Sept2024.csv")
 
-t <- BL_all_scrape$FDep 
-t2 <-t %>% filter(is.na(ForestDependency), is.na(Alt))
-## errors: R<fc>ppell's Warbler Alstr<f6>m's Warbler Oberl<e4>nder's Ground-thrush
-# R<fc>ppell's Starling R<fc>ppell's Chat R<fc>ppell's Robin-Chat R<fc>ck's Blue-flycatcher
-# B<f6>hm's Flycatcher B<f6>hm's Flycatcher
-# unable to translate to wide string
+# Tidying elevation ------------------------------------------------------------
+dep_elev <- read.csv("Data/IUCN/ForestDep_and_elev_Sept2024.csv")
 
-# time out Ultramarine Grosbeak, Glaucous-blue Grosbeak, Western Tanager, Western Tanager
+elev_sh <- dep_elev %>% separate_wider_delim(Alt, delim = " - ", too_few = "align_start", 
+                                  names = c("elev_min", "elev_max")) %>%
+  mutate(elev_max = gsub(" m", "", elev_max),
+         elev_max = as.numeric(elev_max),
+         elev_min = as.numeric(elev_min)) %>%
+  select(cn, sn, elev_min, elev_max)
+
+write.csv(elev_sh, "Data/IUCN/tidy_elev_Sept2024.csv")
+
