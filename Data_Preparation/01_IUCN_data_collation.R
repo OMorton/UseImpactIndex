@@ -99,7 +99,8 @@ thr_sum <- thr_raw %>% group_by(scientificName, code_coarse) %>%
   summarise(score_upd = max(score_upd))
 
 backbone <- expand.grid(scientificName = unique(thr_sum$scientificName),
-                        code_coarse = as.character(c(1:12)))
+                        code_coarse = c("1", "2", "3", "4","5.1", "5.2-5.3", "5.4",
+                                        "6", "7", "8", "9", "10", "11", "12"))
 
 # ref data of the IUCN threat classification 3.1
 # https://www.iucnredlist.org/resources/threat-classification-scheme
