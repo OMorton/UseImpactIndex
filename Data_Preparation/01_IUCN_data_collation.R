@@ -284,7 +284,15 @@ elev_sh <- dep_elev %>% separate_wider_delim(Alt, delim = " - ", too_few = "alig
          eoo_km = as.numeric(gsub(",", "", eoo_km)),
          Forest_medhigh = ifelse(ForestDependency %in% 
                                    c("mediun","medium", "high"), 1,0)) %>%
-  select(cn, sn, elev_min, elev_max, eoo_km, Forest_medhigh, MigrStatus)
+  select(cn, sn, elev_min, elev_max, eoo_km, Forest_medhigh, MigrStatus) %>%
+  filter(!is.na(MigrStatus))
 
 write.csv(elev_sh, "Data/IUCN/tidy_elev_Sept2024.csv")
 
+# Tidying habitat --------------------------------------------------------------
+
+Hab <- read.csv("Data/IUCN/Habitatdetails_Sept2024.csv")
+Hab_tidy <- Hab %>% group_by(sn) %>% 
+  summarise(L1_habs = length(unique(habitat_level_1)))
+
+write.csv(Hab_tidy, "Data/IUCN/tidy_hab_Sept2024.csv")
