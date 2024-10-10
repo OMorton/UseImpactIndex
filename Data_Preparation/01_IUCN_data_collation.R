@@ -273,12 +273,18 @@ write.csv(BL_all_scrape$History, "Data/IUCN/IUCNHistoricalAssessments_Sept2024.c
 # Tidying elevation ------------------------------------------------------------
 dep_elev <- read.csv("Data/IUCN/ForestDep_and_elev_Sept2024.csv")
 
+unique(dep_elev$MigrStatus)
+
 elev_sh <- dep_elev %>% separate_wider_delim(Alt, delim = " - ", too_few = "align_start", 
                                   names = c("elev_min", "elev_max")) %>%
   mutate(elev_max = gsub(" m", "", elev_max),
          elev_max = as.numeric(elev_max),
-         elev_min = as.numeric(elev_min)) %>%
-  select(cn, sn, elev_min, elev_max)
+         elev_min = as.numeric(elev_min),
+         eoo_km = gsub(" km2", "", EOO),
+         eoo_km = as.numeric(gsub(",", "", eoo_km)),
+         Forest_medhigh = ifelse(ForestDependency %in% 
+                                   c("mediun","medium", "high"), 1,0)) %>%
+  select(cn, sn, elev_min, elev_max, eoo_km, Forest_medhigh, MigrStatus)
 
 write.csv(elev_sh, "Data/IUCN/tidy_elev_Sept2024.csv")
 
