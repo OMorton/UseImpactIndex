@@ -58,6 +58,50 @@ for(i in 1:nrow(IUCN_all)){ # would have used for(sp in speciesList) but need i 
 
 #write.csv(df, "Data/IUCN/IUCN_all_ThreatAssessments_Sept2024.csv")
 
+# Get IUCN Historic Threat data-------------------------------------------------
+
+apikey <- "a3fc116c122aefc621329055aeae8f67483e575c518acc14fcb77709bd94f6a2"
+
+IUCN_all <- read.csv("Data/IUCN/Taxonomy_Sept2024.csv")
+length(unique(IUCN_all$scientificName)) # 11195
+
+# Faster alternate way of getting iucn data but doesnt debug as easily for nomenclature errors
+# redlist_status <- do.call(rbind,lapply(spp,FUN=function(sp){rl_search(sp, key= MY_IUCN_REDLIST_KEY)$result}))
+
+## Dummy data frame for the loops
+df <- data.frame(Taxon = character(),
+                 Year = character(),
+                 IUCN_code = character(),
+                 IUCN_cat = character())
+
+
+for(i in 1:nrow(IUCN_all)){
+  ## incorporate 2s delay between each query
+  Sys.sleep(2)
+  ## Progress update
+  cat('Species=',i, '\n')
+  ## get historical data from website
+  sp <- IUCN_all$scientificName[i]
+  iucnHistory <- rl_history(name=sp, key=apikey)
+  # IF species cannot be found
+  if (length(iucnHistory$result) == 0){ 
+    spDf <- data.frame(Taxon = sp,
+                       Year = NA,
+                       IUCN_code = NA,
+                       IUCN_cat = NA)
+    df <- rbind(df, spDf)
+    # cat('Check ', sp, '\n')
+  } else { 
+    spdf <- data.frame(Taxon = sp,
+                       Year = iucnHistory$result$year,
+                       IUCN_code = iucnHistory$result$code,
+                       IUCN_cat = iucnHistory$result$category)
+    df <- rbind(df, spdf)
+  }
+}
+
+#write.csv(df, "Data/IUCN/IUCN_all_HistoricThreatAssessments_Jan2025.csv")
+
 # Make threat score matrix -----------------------------------------------------
 
 
