@@ -100,7 +100,36 @@ for(i in 1:nrow(IUCN_all)){
   }
 }
 
-#write.csv(df, "Data/IUCN/IUCN_all_HistoricThreatAssessments_Jan2025.csv")
+#write.csv(df, "Data/IUCN/IUCN_all_HistoricThreatAssessments_Jan2025_RAW.csv")
+
+
+historic_iucn <- df
+## Whne species have two assessments per year only keep most recent.
+multi_assess <- df %>% group_by(Taxon, Year) %>% filter(n()>1)
+historic_iucn_dedup <- historic_iucn %>% group_by(Taxon, Year) %>% slice_tail(n = 1)
+
+## clean up names
+historic_IUCN_up <- historic_iucn_dedup %>%
+  mutate(IUCN_code = replace(IUCN_code, IUCN_code == "LR/lc", "LC"),
+         IUCN_code = replace(IUCN_code, IUCN_code == "LR/nt", "NT"),
+         IUCN_code = replace(IUCN_code, IUCN_code == "LR/cd", "NT"))
+
+backbone <- expand.grid(Year = as.integer(1975:2024), Taxon = unique(historic_IUCN_up$Taxon))
+
+## left join this and create your unrolled status
+## Some species in trade before being IUCN assessed these are the NA values
+historic_IUCN_up$Year <- as.integer(historic_IUCN_up$Year)
+backbone$Year <- as.integer(backbone$Year)
+
+df_new <- left_join(backbone, historic_IUCN_up) %>%
+  arrange(Taxon, Year) %>% group_by(Taxon) %>% 
+  fill(IUCN_code , .direction = "down") %>% 
+  filter(Year %in% c(1999:2024)) %>% ungroup() %>%
+  select(Year, Taxon, IUCN_code) %>% 
+  mutate(IUCN_code = replace_na(IUCN_code, "Not assessed"))
+
+write.csv(df_new, "Data/IUCN/IUCN_all_HistoricThreatAssessments_Jan2025_series.csv")
+
 
 # Make threat score matrix -----------------------------------------------------
 
